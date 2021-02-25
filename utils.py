@@ -5,6 +5,14 @@ import numpy as np
 import torch
 from sklearn.metrics import average_precision_score
 
+def normalized(input):
+    output = (input - input.min()) / (input.max() - input.min())
+    # output = torch.zeros(input.shape)
+    # for ind, ele in enumerate(input):
+    #     if ele.max() - ele.min() != 0:
+    #         output[ind] = (ele - ele.min()) / (ele.max() - ele.min())
+    return output
+
 def save_pkl(pkl_data, save_path):
     with open(save_path, 'wb') as f:
         pickle.dump(pkl_data, f)

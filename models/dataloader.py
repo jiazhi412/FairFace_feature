@@ -3,6 +3,9 @@ from torch.utils.data import Dataset
 import pandas as pd
 import os
 from matplotlib import image
+from PIL import Image
+import utils
+import numpy as np
 
 def load_data(dir, opt):
     train_imgs_df = pd.read_csv(os.path.join(dir, 'fairface_label_train.csv'))
@@ -38,17 +41,29 @@ def load_data(dir, opt):
 
 
 class FairFaceDataset(Dataset):
-    def __init__(self, imgs, df):
+    def __init__(self, imgs, df, l=None, transform=None):
         self.imgs = imgs
-        self.labels = [i for i in range(len(df))]
         self.df = df
+        self.transform = transform
+        if l != None:
+            self.l = l
+        else:
+            self.l = len(self.df)
+        # print(type(self.l))
+        self.labels = [i for i in range(self.l)]
+        self.labels = utils.normalized(np.array(self.labels))
     
     def __len__(self):
-        return len(self.imgs)
+        return self.l
     
     def __getitem__(self, idx):
-        img = self.imgs[idx]
+        key = self.df['file'][idx]
+        img = self.imgs[key][()]
         label = self.labels[idx]
-        gender = self.pd['gender'].tolist()[idx]
-        race = self.pd['race'].tolist()[idx]
-        return color_img, label, gender, race
+
+        if self.transform is not None:
+            img = self.transform(img)
+        # print(label)
+        # print(torch.FloatTensor(label))
+        # return img, torch.FloatTensor(label)
+        return img, label

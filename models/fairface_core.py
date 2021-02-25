@@ -13,6 +13,7 @@ from models import dataloader
 import utils
 import pandas as pd
 from matplotlib import image
+from sklearn.metrics import average_precision_score
 
 class FairFaceModel():
     def __init__(self, opt):
@@ -28,6 +29,7 @@ class FairFaceModel():
         self.set_data(opt)
         self.set_optimizer(opt)
         self.best_dev_mAP = 0.
+        self.best_train_loss = 10000000000
 
     def set_network(self, opt):
         """Define the network"""
@@ -43,94 +45,73 @@ class FairFaceModel():
         out, feature = self.network(x)
         return out, feature
     
-    def set_data(self, opt):
-        train_imgs_df = pd.read_csv(os.path.join(opt['dir'], 'fairface_label_train.csv'))
-        test_imgs_df = pd.read_csv(os.path.join(opt['dir'], 'fairface_label_val.csv'))
-
-        train_imgs_list = []
-        for index, img_path in enumerate(train_imgs_df['file']):
-            img = image.imread(os.path.join(opt['dir'], img_path))
-            train_imgs_list.append(img)
-        self.train_loader = DataLoader(
-            FairFaceDataset(train_imgs_list, train_imgs_df), 
-            batch_size=opt['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
-
-        test_imgs_list = []
-        for index, img_path in enumerate(test_imgs_df['file']):
-            img = image.imread(os.path.join(opt['dir'], img_path))
-            test_imgs_list.append(img)
-        self.test_loader = DataLoader(
-            FairFaceDataset(test_imgs_list, test_imgs_df), 
-            batch_size=len(test_imgs_list), shuffle=False, num_workers=1, pin_memory=True)        
-
-        self.dev_loader = self.test_loader
-
-        self.test_gender = test_imgs_df['gender'].tolist()
-        self.test_race = test_imgs_df['race'].tolist()
-
     # def set_data(self, opt):
-    #     """Set up the dataloaders"""
-        
-    #     data_setting = opt['data_setting']
+    #     train_imgs_df = pd.read_csv(os.path.join(opt['dir'], 'fairface_label_train.csv'))
+    #     test_imgs_df = pd.read_csv(os.path.join(opt['dir'], 'fairface_label_val.csv'))
 
-    #     # normalize according to ImageNet
-    #     mean = [0.485, 0.456, 0.406]
-    #     std = [0.229, 0.224, 0.225]
-    #     normalize = transforms.Normalize(mean=mean, std=std)
+    #     train_imgs_list = []
+    #     for index, img_path in enumerate(train_imgs_df['file']):
+    #         img = image.imread(os.path.join(opt['dir'], img_path))
+    #         train_imgs_list.append(img)
+    #     self.train_loader = DataLoader(
+    #         FairFaceDataset(train_imgs_list, train_imgs_df), 
+    #         batch_size=opt['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
 
-    #     if data_setting['augment']:
-    #         transform_train = transforms.Compose([
-    #             transforms.Resize(256),
-    #             transforms.RandomCrop(224),
-    #             transforms.RandomHorizontalFlip(),
-    #             transforms.ToTensor(),
-    #             normalize,
-    #         ])
-    #     else:
-    #         transform_train = transforms.Compose([
-    #             transforms.Resize(256),
-    #             transforms.CenterCrop(224),
-    #             transforms.ToTensor(),
-    #             normalize,
-    #         ])
+    #     test_imgs_list = []
+    #     for index, img_path in enumerate(test_imgs_df['file']):
+    #         img = image.imread(os.path.join(opt['dir'], img_path))
+    #         test_imgs_list.append(img)
+    #     self.test_loader = DataLoader(
+    #         FairFaceDataset(test_imgs_list, test_imgs_df), 
+    #         batch_size=len(test_imgs_list), shuffle=False, num_workers=1, pin_memory=True)        
 
-    #     transform_test = transforms.Compose([
-    #         transforms.Resize(256),
-    #         transforms.CenterCrop(224),
-    #         transforms.ToTensor(),
-    #         normalize,
-    #     ])
+    #     self.dev_loader = self.test_loader
 
-    #     image_feature = h5py.File(data_setting['image_feature_path'], 'r')
-    #     target_dict = utils.load_pkl(data_setting['target_dict_path'])
-    #     train_key_list = utils.load_pkl(data_setting['train_key_list_path'])
-    #     dev_key_list = utils.load_pkl(data_setting['dev_key_list_path'])
-    #     test_key_list = utils.load_pkl(data_setting['test_key_list_path'])
+    #     self.test_gender = test_imgs_df['gender'].tolist()
+    #     self.test_race = test_imgs_df['race'].tolist()
+
+    def set_data(self, opt):
+        """Set up the dataloaders"""
+        # normalize according to ImageNet
+        mean = [0.485, 0.456, 0.406]
+        std = [0.229, 0.224, 0.225]
+        normalize = transforms.Normalize(mean=mean, std=std)
+
+        transform_train = transforms.Compose([
+            # transforms.Resize(256),
+            # transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+        transform_test = transforms.Compose([
+            # transforms.Resize(256),
+            # transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize,
+        ])
+
+        dir = './data'
+        train_imgs_df = pd.read_csv(os.path.join(dir, 'fairface_label_train.csv'))
+        test_imgs_df = pd.read_csv(os.path.join(dir, 'fairface_label_val.csv'))
         
-    #     train_data = dataloader.CelebaDataset(train_key_list, image_feature, 
-    #                                           target_dict, transform_train)
-    #     self.train_loader = torch.utils.data.DataLoader(
-    #                             train_data, batch_size=opt['batch_size'],
-    #                             shuffle=True, num_workers=1)
-    #     dev_data = dataloader.CelebaDataset(dev_key_list, image_feature, 
-    #                                         target_dict, transform_test)
-    #     self.dev_loader = torch.utils.data.DataLoader(
-    #                           dev_data, batch_size=opt['batch_size'],
-    #                           shuffle=False, num_workers=1)
-    #     test_data = dataloader.CelebaDataset(test_key_list, image_feature, 
-    #                                          target_dict, transform_test)
-    #     self.test_loader = torch.utils.data.DataLoader(
-    #                            test_data, batch_size=opt['batch_size'],
-    #                            shuffle=False, num_workers=1)
+        train_image_feature = h5py.File(os.path.join(dir, 'fairface_train.h5py'), 'r')
+        test_image_feature = h5py.File(os.path.join(dir, 'fairface_test.h5py'), 'r')
         
-    #     self.dev_target = np.array([target_dict[key] for key in dev_key_list])
-    #     self.dev_class_weight = utils.compute_class_weight(self.dev_target)
-    #     self.test_target = np.array([target_dict[key] for key in test_key_list])
-    #     self.test_class_weight = utils.compute_class_weight(self.test_target)
-        
-    #     # We only evaluate on a subset of attributes that have enough test data
-    #     # on both domain
-    #     self.subclass_idx = utils.load_pkl(data_setting['subclass_idx_path'])
+        # train_imgs_list = utils.load_pkl(os.path.join(dir, "train_imgs_list.pkl"))
+        # test_imgs_list = utils.load_pkl(os.path.join(dir, "test_imgs_list.pkl"))
+        self.train_gender = utils.load_pkl(os.path.join(dir, "train_gender.pkl"))
+        self.train_race = utils.load_pkl(os.path.join(dir, "train_race.pkl"))
+        self.test_gender = utils.load_pkl(os.path.join(dir, "test_gender.pkl"))
+        self.test_race = utils.load_pkl(os.path.join(dir, "test_race.pkl"))
+        self.train_target = utils.normalized(np.array([i for i in range(opt['train_size'])]))
+
+        self.train_loader = torch.utils.data.DataLoader(
+            dataloader.FairFaceDataset(train_image_feature, train_imgs_df, l = opt['train_size'], transform = transform_train), 
+            batch_size=opt['batch_size'], shuffle=True, num_workers=1)
+        self.test_loader = torch.utils.data.DataLoader(
+            dataloader.FairFaceDataset(test_image_feature, test_imgs_df, l = opt['test_size'], transform = transform_test), 
+            batch_size=len(test_image_feature), shuffle=False, num_workers=1)
         
     def set_optimizer(self, opt):
         optimizer_setting = opt['optimizer_setting']
@@ -141,7 +122,12 @@ class FairFaceModel():
                             )
         
     def _criterion(self, output, target):
-        return F.binary_cross_entropy_with_logits(output, target[:, :-1])
+        # return F.binary_cross_entropy_with_logits(output, target[:, :-1])
+        # print(output.shape)
+        # print(target.shape)
+        # print(output)
+        # print(target)
+        return F.binary_cross_entropy_with_logits(output, target.view((-1, 1)))
         
     def state_dict(self):
         state_dict = {
@@ -161,6 +147,10 @@ class FairFaceModel():
         
         train_loss = 0
         for i, (images, targets) in enumerate(loader):
+            # print(i)
+            # print(type(images))
+            # print(images.shape)
+            # print(targets.shape)
             images, targets = images.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
             outputs, _ = self.forward(images)
@@ -211,53 +201,99 @@ class FairFaceModel():
         start_time = datetime.now()
         self._train(self.train_loader)
         utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, 'ckpt.pth'))
-        
-        dev_loss, dev_output, _ = self._test(self.dev_loader)
-        dev_predict_prob = self.inference(dev_output)
-        dev_per_class_AP = utils.compute_weighted_AP(self.dev_target, dev_predict_prob, 
-                                                     self.dev_class_weight)
-        dev_mAP = utils.compute_mAP(dev_per_class_AP, self.subclass_idx)
-        
-        self.log_result('Dev epoch', {'loss': dev_loss/len(self.dev_loader), 'mAP': dev_mAP},
-                        self.epoch)
-        if dev_mAP > self.best_dev_mAP:
-            self.best_dev_mAP = dev_mAP
+
+        train_loss, train_output, train_feature = self._test(self.train_loader)
+        train_predict_prob = self.inference(train_output)
+        self.log_result('Train epoch', {'loss': train_loss/len(self.train_loader)}, self.epoch)
+        if train_loss < self.best_train_loss:
+            self.best_train_loss = train_loss
             utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, 'best.pth'))
         
+        # train_result = {'output': train_output.cpu().numpy(), 
+        #               'feature': train_feature.cpu().numpy(),
+        #               'gender': self.train_gender,
+        #               'race': self.train_race}
+        # utils.save_pkl(train_result, os.path.join(self.save_path, 'train_result.pkl'))
+        
         duration = datetime.now() - start_time
-        print('Finish training epoch {}, dev mAP: {}, time used: {}'.format(self.epoch, dev_mAP, duration))
+        print('Finish training epoch {}, time used: {}'.format(self.epoch, duration))
+
+
+        # train_mAP = average_precision_score(self.train_target, train_predict_prob)
+
+        # train_per_class_AP = utils.compute_weighted_AP(self.train_target, train_predict_prob, 
+        #                                              self.train_class_weight)
+        # train_mAP = utils.compute_mAP(train_per_class_AP, self.subclass_idx)
+        
+        # self.log_result('Train epoch', {'loss': train_loss/len(self.train_loader), 'mAP': train_mAP},
+        #                 self.epoch)
+        # if train_mAP > self.best_train_mAP:
+        #     self.best_train_mAP = train_mAP
+        #     utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, 'best.pth'))
+        
+        # duration = datetime.now() - start_time
+        # print('Finish training epoch {}, train mAP: {}, time used: {}'.format(self.epoch, train_mAP, duration))
+
+        # dev_loss, dev_output, _ = self._test(self.dev_loader)
+        # dev_predict_prob = self.inference(dev_output)
+        # dev_per_class_AP = utils.compute_weighted_AP(self.dev_target, dev_predict_prob, 
+        #                                              self.dev_class_weight)
+        # dev_mAP = utils.compute_mAP(dev_per_class_AP, self.subclass_idx)
+        
+        # self.log_result('Dev epoch', {'loss': dev_loss/len(self.dev_loader), 'mAP': dev_mAP},
+        #                 self.epoch)
+        # if dev_mAP > self.best_dev_mAP:
+        #     self.best_dev_mAP = dev_mAP
+        #     utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, 'best.pth'))
+        
+        # duration = datetime.now() - start_time
+        # print('Finish training epoch {}, dev mAP: {}, time used: {}'.format(self.epoch, dev_mAP, duration))
 
     def test(self):
         # Test and save the result
         state_dict = torch.load(os.path.join(self.save_path, 'best.pth'))
+        print('1.5')
         self.network.load_state_dict(state_dict['model'])
-        
-        dev_loss, dev_output, dev_feature = self._test(self.dev_loader)
-        dev_predict_prob = self.inference(dev_output)
-        dev_per_class_AP = utils.compute_weighted_AP(self.dev_target, dev_predict_prob, 
-                                                     self.dev_class_weight)
-        dev_mAP = utils.compute_mAP(dev_per_class_AP, self.subclass_idx)
-        dev_result = {'output': dev_output.cpu().numpy(), 
-                      'feature': dev_feature.cpu().numpy(),
-                      'per_class_AP': dev_per_class_AP,
-                      'mAP': dev_mAP}
-        utils.save_pkl(dev_result, os.path.join(self.save_path, 'dev_result.pkl'))
-        
-        test_loss, test_output, test_feature = self._test(self.test_loader)
-        test_predict_prob = self.inference(test_output)
-        test_per_class_AP = utils.compute_weighted_AP(self.test_target, test_predict_prob, 
-                                                     self.test_class_weight)
-        test_mAP = utils.compute_mAP(test_per_class_AP, self.subclass_idx)
+        print('2')
+        test_loss, test_output, test_feature = self._test(self.test_loader) 
+        print('3')
         test_result = {'output': test_output.cpu().numpy(), 
                       'feature': test_feature.cpu().numpy(),
-                      'per_class_AP': test_per_class_AP,
-                      'mAP': test_mAP}
+                      'gender': self.test_gender,
+                      'race': self.test_race}
         utils.save_pkl(test_result, os.path.join(self.save_path, 'test_result.pkl'))
-        
+
         # Output the mean AP for the best model on dev and test set
-        info = ('Dev mAP: {}\n'
-                'Test mAP: {}'.format(dev_mAP, test_mAP))
+        info = ('Test loss: {}\n'.format(test_result))
         utils.write_info(os.path.join(self.save_path, 'result.txt'), info)
+        
+        
+        # dev_loss, dev_output, dev_feature = self._test(self.dev_loader)
+        # dev_predict_prob = self.inference(dev_output)
+        # dev_per_class_AP = utils.compute_weighted_AP(self.dev_target, dev_predict_prob, 
+        #                                              self.dev_class_weight)
+        # dev_mAP = utils.compute_mAP(dev_per_class_AP, self.subclass_idx)
+        # dev_result = {'output': dev_output.cpu().numpy(), 
+        #               'feature': dev_feature.cpu().numpy(),
+        #               'per_class_AP': dev_per_class_AP,
+        #               'mAP': dev_mAP}
+        # utils.save_pkl(dev_result, os.path.join(self.save_path, 'dev_result.pkl'))
+        
+        # test_loss, test_output, test_feature = self._test(self.test_loader)
+        # test_predict_prob = self.inference(test_output)
+        # test_per_class_AP = utils.compute_weighted_AP(self.test_target, test_predict_prob, 
+        #                                              self.test_class_weight)
+        # test_mAP = utils.compute_mAP(test_per_class_AP, self.subclass_idx)
+        # test_result = {'output': test_output.cpu().numpy(), 
+        #               'feature': test_feature.cpu().numpy(),
+        #               'per_class_AP': test_per_class_AP,
+        #               'mAP': test_mAP}
+        # utils.save_pkl(test_result, os.path.join(self.save_path, 'test_result.pkl'))
+        
+        # # Output the mean AP for the best model on dev and test set
+        # info = ('Dev mAP: {}\n'
+        #         'Test mAP: {}'.format(dev_mAP, test_mAP))
+        # utils.write_info(os.path.join(self.save_path, 'result.txt'), info)
     
 
 
