@@ -19,10 +19,12 @@ class FairFaceModel():
     def __init__(self, opt):
         super(FairFaceModel, self).__init__()
         self.epoch = 0
+        self.experiment = opt['experiment']
         self.device = opt['device']
         self.save_path = opt['save_folder']
         self.print_freq = opt['print_freq']
         self.init_lr = opt['optimizer_setting']['lr']
+        self.opt = opt
         self.log_writer = SummaryWriter(os.path.join(self.save_path, 'logfile'))
         
         self.set_network(opt)
@@ -30,6 +32,9 @@ class FairFaceModel():
         self.set_optimizer(opt)
         self.best_dev_mAP = 0.
         self.best_train_loss = 10000000000
+
+        self.test_gender = []
+        self.test_race = []
 
     def set_network(self, opt):
         """Define the network"""
@@ -98,20 +103,23 @@ class FairFaceModel():
         train_image_feature = h5py.File(os.path.join(dir, 'fairface_train.h5py'), 'r')
         test_image_feature = h5py.File(os.path.join(dir, 'fairface_test.h5py'), 'r')
         
-        # train_imgs_list = utils.load_pkl(os.path.join(dir, "train_imgs_list.pkl"))
-        # test_imgs_list = utils.load_pkl(os.path.join(dir, "test_imgs_list.pkl"))
-        self.train_gender = utils.load_pkl(os.path.join(dir, "train_gender.pkl"))
-        self.train_race = utils.load_pkl(os.path.join(dir, "train_race.pkl"))
-        self.test_gender = utils.load_pkl(os.path.join(dir, "test_gender.pkl"))
-        self.test_race = utils.load_pkl(os.path.join(dir, "test_race.pkl"))
-        self.train_target = utils.normalized(np.array([i for i in range(opt['train_size'])]))
-
         self.train_loader = torch.utils.data.DataLoader(
-            dataloader.FairFaceDataset(train_image_feature, train_imgs_df, l = opt['train_size'], transform = transform_train), 
+            dataloader.FairFaceDataset(train_image_feature, train_imgs_df, female_percentage = opt['female_percentage'], select_flag = True, l = opt['train_size'], transform = transform_train), 
             batch_size=opt['batch_size'], shuffle=True, num_workers=1)
-        self.test_loader = torch.utils.data.DataLoader(
-            dataloader.FairFaceDataset(test_image_feature, test_imgs_df, l = opt['test_size'], transform = transform_test), 
-            batch_size=len(test_image_feature), shuffle=False, num_workers=1)
+        if opt['experiment'].endswith('data'):
+            self.test_loader = torch.utils.data.DataLoader(
+                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, female_percentage = opt['female_percentage'], select_flag = True, l = opt['test_size'], transform = transform_test), 
+                batch_size=opt['test_size'], shuffle=False, num_workers=1)
+        elif opt['experiment'].endswith('model'):
+            self.test_loader = torch.utils.data.DataLoader(
+                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, female_percentage = opt['female_percentage'], select_flag = False, l = opt['test_size'], transform = transform_test), 
+                batch_size=opt['test_size'], shuffle=False, num_workers=1)
+
+        # self.train_gender = utils.load_pkl(os.path.join(dir, "train_gender.pkl"))[:opt['train_size']]
+        # self.train_race = utils.load_pkl(os.path.join(dir, "train_race.pkl"))[:opt['train_size']]
+        # self.test_gender = utils.load_pkl(os.path.join(dir, "test_gender.pkl"))[:opt['test_size']]
+        # self.test_race = utils.load_pkl(os.path.join(dir, "test_race.pkl"))[:opt['test_size']]
+        self.train_target = utils.normalized(np.array([i for i in range(opt['train_size'])]))
         
     def set_optimizer(self, opt):
         optimizer_setting = opt['optimizer_setting']
@@ -146,7 +154,7 @@ class FairFaceModel():
         self.network.train()
         
         train_loss = 0
-        for i, (images, targets) in enumerate(loader):
+        for i, (images, targets, _, _) in enumerate(loader):
             # print(i)
             # print(type(images))
             # print(images.shape)
@@ -178,7 +186,7 @@ class FairFaceModel():
         output_list = []
         feature_list = []
         with torch.no_grad():
-            for i, (images, targets) in enumerate(loader):
+            for i, (images, targets, gender, race) in enumerate(loader):
                 images, targets = images.to(self.device), targets.to(self.device)
                 outputs, features = self.forward(images)
                 loss = self._criterion(outputs, targets)
@@ -186,6 +194,8 @@ class FairFaceModel():
 
                 output_list.append(outputs)
                 feature_list.append(features)
+                self.test_gender.append(gender)
+                self.test_race.append(race)
 
         return test_loss, torch.cat(output_list), torch.cat(feature_list)
 
@@ -261,7 +271,9 @@ class FairFaceModel():
                       'feature': test_feature.cpu().numpy(),
                       'gender': self.test_gender,
                       'race': self.test_race}
-        utils.save_pkl(test_result, os.path.join(self.save_path, 'test_result.pkl'))
+        mode = self.experiment.split("_")[-1]
+        female_percentage = self.opt[female_percentage]
+        utils.save_pkl(test_result, os.path.join(self.save_path, f"feature_{mode}_{female_percentage}.pkl"))
 
         # Output the mean AP for the best model on dev and test set
         info = ('Test loss: {}\n'.format(test_result))

@@ -41,15 +41,19 @@ def load_data(dir, opt):
 
 
 class FairFaceDataset(Dataset):
-    def __init__(self, imgs, df, l=None, transform=None):
+    def __init__(self, imgs, df, female_percentage, select_flag, l=None, transform=None):
         self.imgs = imgs
-        self.df = df
-        self.transform = transform
-        if l != None:
-            self.l = l
+        # fp = 0.9
+        if select_flag:
+            self.df = select(df, female_percentage, l)
         else:
-            self.l = len(self.df)
-        # print(type(self.l))
+            self.df = df
+        self.transform = transform
+        # if l != None:
+        #     self.l = l
+        # else:
+        #     self.l = len(self.df)
+        self.l = len(self.df)
         self.labels = [i for i in range(self.l)]
         self.labels = utils.normalized(np.array(self.labels))
     
@@ -57,13 +61,23 @@ class FairFaceDataset(Dataset):
         return self.l
     
     def __getitem__(self, idx):
-        key = self.df['file'][idx]
+        key = self.df.loc[idx, 'file']
         img = self.imgs[key][()]
         label = self.labels[idx]
+        gender = self.df.loc[idx, 'gender']
+        race = self.df.loc[idx, 'race']
 
         if self.transform is not None:
             img = self.transform(img)
         # print(label)
         # print(torch.FloatTensor(label))
         # return img, torch.FloatTensor(label)
-        return img, label
+        return img, label, gender, race
+
+
+def select(df, female_percentage, l):
+    female = df[df["gender"] == "Female"]
+    male = df[df["gender"] == "Male"]
+    res = pd.concat([female.head(int(l*female_percentage)), male.head(int(l- l * female_percentage))])
+    res.index = range(len(res))
+    return res
