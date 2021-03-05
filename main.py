@@ -26,7 +26,7 @@ def main(model, opt):
     if opt['mode'] == 'train':
         for epoch in range(opt['total_epochs']):
             model.train()
-    print('1')
+    # print('1')
     model.test()
 
 if __name__ == '__main__':

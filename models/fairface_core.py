@@ -109,11 +109,11 @@ class FairFaceModel():
         if opt['experiment'].endswith('data'):
             self.test_loader = torch.utils.data.DataLoader(
                 dataloader.FairFaceDataset(test_image_feature, test_imgs_df, female_percentage = opt['female_percentage'], select_flag = True, l = opt['test_size'], transform = transform_test), 
-                batch_size=opt['test_size'], shuffle=False, num_workers=1)
+                batch_size=opt['batch_size'], shuffle=False, num_workers=1)
         elif opt['experiment'].endswith('model'):
             self.test_loader = torch.utils.data.DataLoader(
-                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, female_percentage = opt['female_percentage'], select_flag = False, l = opt['test_size'], transform = transform_test), 
-                batch_size=opt['test_size'], shuffle=False, num_workers=1)
+                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, female_percentage = 0.5, select_flag = True, l = opt['test_size'], transform = transform_test), 
+                batch_size=opt['batch_size'], shuffle=False, num_workers=1)
 
         # self.train_gender = utils.load_pkl(os.path.join(dir, "train_gender.pkl"))[:opt['train_size']]
         # self.train_race = utils.load_pkl(os.path.join(dir, "train_race.pkl"))[:opt['train_size']]
@@ -185,18 +185,25 @@ class FairFaceModel():
         test_loss = 0
         output_list = []
         feature_list = []
+        gender_list = []
+        race_list = []
         with torch.no_grad():
             for i, (images, targets, gender, race) in enumerate(loader):
+                # print("2.5")
                 images, targets = images.to(self.device), targets.to(self.device)
                 outputs, features = self.forward(images)
                 loss = self._criterion(outputs, targets)
                 test_loss += loss.item()
-
+                # print('2.6')
                 output_list.append(outputs)
                 feature_list.append(features)
-                self.test_gender.append(gender)
-                self.test_race.append(race)
+                gender_list.extend(list(gender))
+                race_list.extend(list(race))
 
+                # print(gender)
+                # print(gender_list)
+        self.test_gender = gender_list
+        self.test_race = race_list
         return test_loss, torch.cat(output_list), torch.cat(feature_list)
 
     def inference(self, output):
@@ -207,17 +214,19 @@ class FairFaceModel():
         """Train the model for one epoch, evaluate on validation set and 
         save the best model
         """
-        
+        mode = self.experiment.split("_")[-1]
+        female_percentage = self.opt['female_percentage']        
+
         start_time = datetime.now()
         self._train(self.train_loader)
-        utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, 'ckpt.pth'))
+        utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'ckpt_{mode}_{female_percentage}.pth'))
 
         train_loss, train_output, train_feature = self._test(self.train_loader)
         train_predict_prob = self.inference(train_output)
         self.log_result('Train epoch', {'loss': train_loss/len(self.train_loader)}, self.epoch)
         if train_loss < self.best_train_loss:
             self.best_train_loss = train_loss
-            utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, 'best.pth'))
+            utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'best_{mode}_{female_percentage}.pth'))
         
         # train_result = {'output': train_output.cpu().numpy(), 
         #               'feature': train_feature.cpu().numpy(),
@@ -260,21 +269,21 @@ class FairFaceModel():
         # print('Finish training epoch {}, dev mAP: {}, time used: {}'.format(self.epoch, dev_mAP, duration))
 
     def test(self):
+        mode = self.experiment.split("_")[-1]
+        female_percentage = self.opt['female_percentage']
         # Test and save the result
-        state_dict = torch.load(os.path.join(self.save_path, 'best.pth'))
-        print('1.5')
+        state_dict = torch.load(os.path.join(self.save_path, f'best_{mode}_{female_percentage}.pth'))
+        # print('1.5')
         self.network.load_state_dict(state_dict['model'])
-        print('2')
+        # print('2')
         test_loss, test_output, test_feature = self._test(self.test_loader) 
-        print('3')
+        # print('3')
         test_result = {'output': test_output.cpu().numpy(), 
                       'feature': test_feature.cpu().numpy(),
                       'gender': self.test_gender,
                       'race': self.test_race}
-        mode = self.experiment.split("_")[-1]
-        female_percentage = self.opt[female_percentage]
+        
         utils.save_pkl(test_result, os.path.join(self.save_path, f"feature_{mode}_{female_percentage}.pkl"))
-
         # Output the mean AP for the best model on dev and test set
         info = ('Test loss: {}\n'.format(test_result))
         utils.write_info(os.path.join(self.save_path, 'result.txt'), info)
