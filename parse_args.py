@@ -55,6 +55,4 @@ def create_experiment_setting(opt):
     if opt['experiment'].startswith('FairFace_baseline'):
         model = models.fairface_core.FairFaceModel(opt)
 
-
-
     return model, opt
