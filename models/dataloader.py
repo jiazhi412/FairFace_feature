@@ -41,18 +41,17 @@ def load_data(dir, opt):
 
 
 class FairFaceDataset(Dataset):
-    def __init__(self, imgs, df, female_percentage, select_flag, l=None, transform=None):
+    def __init__(self, imgs, df, select, percentage, l=None, transform=None):
         self.imgs = imgs
-        # fp = 0.9
-        if select_flag:
-            self.df = select(df, female_percentage, l)
+        if select == 'gender':
+            self.df = select_gender(df, percentage, l)
+        elif select in ['Black', 'White', 'Indian', 'East_Asian']:
+            if select == "East_Asian":
+                select = "East Asian"
+            self.df = select_race(df, select, percentage, l)
         else:
             self.df = df
         self.transform = transform
-        # if l != None:
-        #     self.l = l
-        # else:
-        #     self.l = len(self.df)
         self.l = len(self.df)
         self.labels = [i for i in range(self.l)]
         self.labels = utils.normalized(np.array(self.labels))
@@ -75,9 +74,16 @@ class FairFaceDataset(Dataset):
         return img, label, gender, race
 
 
-def select(df, female_percentage, l):
+def select_gender(df, percentage, l):
     female = df[df["gender"] == "Female"]
     male = df[df["gender"] == "Male"]
     res = pd.concat([female.head(int(l*female_percentage)), male.head(int(l- l * female_percentage))])
+    res.index = range(len(res))
+    return res
+
+def select_race(df, select, percentage, l):
+    race = df[df["race"] == select]
+    other = df[df["race"] != select]
+    res = pd.concat([race.head(int(l*percentage)), other.head(int(l- l * percentage))])
     res.index = range(len(res))
     return res

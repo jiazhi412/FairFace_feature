@@ -50,31 +50,6 @@ class FairFaceModel():
         out, feature = self.network(x)
         return out, feature
     
-    # def set_data(self, opt):
-    #     train_imgs_df = pd.read_csv(os.path.join(opt['dir'], 'fairface_label_train.csv'))
-    #     test_imgs_df = pd.read_csv(os.path.join(opt['dir'], 'fairface_label_val.csv'))
-
-    #     train_imgs_list = []
-    #     for index, img_path in enumerate(train_imgs_df['file']):
-    #         img = image.imread(os.path.join(opt['dir'], img_path))
-    #         train_imgs_list.append(img)
-    #     self.train_loader = DataLoader(
-    #         FairFaceDataset(train_imgs_list, train_imgs_df), 
-    #         batch_size=opt['batch_size'], shuffle=False, num_workers=1, pin_memory=True)
-
-    #     test_imgs_list = []
-    #     for index, img_path in enumerate(test_imgs_df['file']):
-    #         img = image.imread(os.path.join(opt['dir'], img_path))
-    #         test_imgs_list.append(img)
-    #     self.test_loader = DataLoader(
-    #         FairFaceDataset(test_imgs_list, test_imgs_df), 
-    #         batch_size=len(test_imgs_list), shuffle=False, num_workers=1, pin_memory=True)        
-
-    #     self.dev_loader = self.test_loader
-
-    #     self.test_gender = test_imgs_df['gender'].tolist()
-    #     self.test_race = test_imgs_df['race'].tolist()
-
     def set_data(self, opt):
         """Set up the dataloaders"""
         # normalize according to ImageNet
@@ -104,21 +79,17 @@ class FairFaceModel():
         test_image_feature = h5py.File(os.path.join(dir, 'fairface_test.h5py'), 'r')
         
         self.train_loader = torch.utils.data.DataLoader(
-            dataloader.FairFaceDataset(train_image_feature, train_imgs_df, female_percentage = opt['female_percentage'], select_flag = True, l = opt['train_size'], transform = transform_train), 
+            dataloader.FairFaceDataset(train_image_feature, train_imgs_df, select = opt['select'], percentage = opt['percentage'], l = opt['train_size'], transform = transform_train), 
             batch_size=opt['batch_size'], shuffle=True, num_workers=1)
         if opt['experiment'].endswith('data'):
             self.test_loader = torch.utils.data.DataLoader(
-                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, female_percentage = opt['female_percentage'], select_flag = True, l = opt['test_size'], transform = transform_test), 
+                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, select = opt['select'], percentage = opt['percentage'], l = opt['test_size'], transform = transform_test), 
                 batch_size=opt['batch_size'], shuffle=False, num_workers=1)
         elif opt['experiment'].endswith('model'):
             self.test_loader = torch.utils.data.DataLoader(
-                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, female_percentage = 0.5, select_flag = True, l = opt['test_size'], transform = transform_test), 
+                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, select = opt['select'], percentage = 0.5, l = opt['test_size'], transform = transform_test), 
                 batch_size=opt['batch_size'], shuffle=False, num_workers=1)
 
-        # self.train_gender = utils.load_pkl(os.path.join(dir, "train_gender.pkl"))[:opt['train_size']]
-        # self.train_race = utils.load_pkl(os.path.join(dir, "train_race.pkl"))[:opt['train_size']]
-        # self.test_gender = utils.load_pkl(os.path.join(dir, "test_gender.pkl"))[:opt['test_size']]
-        # self.test_race = utils.load_pkl(os.path.join(dir, "test_race.pkl"))[:opt['test_size']]
         self.train_target = utils.normalized(np.array([i for i in range(opt['train_size'])]))
         
     def set_optimizer(self, opt):
@@ -215,18 +186,18 @@ class FairFaceModel():
         save the best model
         """
         mode = self.experiment.split("_")[-1]
-        female_percentage = self.opt['female_percentage']        
+        percentage = self.opt['percentage']        
 
         start_time = datetime.now()
         self._train(self.train_loader)
-        utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'ckpt_{mode}_{female_percentage}.pth'))
+        utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'ckpt_{mode}_{percentage}.pth'))
 
         train_loss, train_output, train_feature = self._test(self.train_loader)
         train_predict_prob = self.inference(train_output)
         self.log_result('Train epoch', {'loss': train_loss/len(self.train_loader)}, self.epoch)
         if train_loss < self.best_train_loss:
             self.best_train_loss = train_loss
-            utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'best_{mode}_{female_percentage}.pth'))
+            utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'best_{mode}_{percentage}.pth'))
         
         # train_result = {'output': train_output.cpu().numpy(), 
         #               'feature': train_feature.cpu().numpy(),
@@ -270,9 +241,9 @@ class FairFaceModel():
 
     def test(self):
         mode = self.experiment.split("_")[-1]
-        female_percentage = self.opt['female_percentage']
+        percentage = self.opt['percentage']
         # Test and save the result
-        state_dict = torch.load(os.path.join(self.save_path, f'best_{mode}_{female_percentage}.pth'))
+        state_dict = torch.load(os.path.join(self.save_path, f'best_{mode}_{percentage}.pth'))
         # print('1.5')
         self.network.load_state_dict(state_dict['model'])
         # print('2')
@@ -283,7 +254,7 @@ class FairFaceModel():
                       'gender': self.test_gender,
                       'race': self.test_race}
         
-        utils.save_pkl(test_result, os.path.join(self.save_path, f"feature_{mode}_{female_percentage}.pkl"))
+        utils.save_pkl(test_result, os.path.join(self.save_path, f"feature_{mode}_{percentage}.pkl"))
         # Output the mean AP for the best model on dev and test set
         info = ('Test loss: {}\n'.format(test_result))
         utils.write_info(os.path.join(self.save_path, 'result.txt'), info)
