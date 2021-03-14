@@ -9,7 +9,8 @@ def collect_args():
     parser.add_argument('--experiment',
                         choices=[
                                  'FairFace_baseline_data',
-                                 'FairFace_baseline_model'
+                                 'FairFace_baseline_model',
+                                 'FairFace_attr_baseline_model'
                                 ], type=str, default='FairFace_baseline_data')
 
     parser.add_argument('--experiment-name', type=str, default='debug', help='specifies a name to this experiment for saving the model and result)')
@@ -39,7 +40,7 @@ def create_experiment_setting(opt):
         opt['print_freq'] = 50
         opt['save_folder'] = os.path.join('record', opt['experiment'], opt['experiment_name'])
         utils.creat_folder(opt['save_folder'])
-        opt['output_dim'] = 1
+        opt['output_dim'] = 18
 
         optimizer_setting = {
             'optimizer': torch.optim.Adam,
@@ -52,5 +53,7 @@ def create_experiment_setting(opt):
 
     if opt['experiment'].startswith('FairFace_baseline'):
         model = models.fairface_core.FairFaceModel(opt)
+    elif opt['experiment'].startswith('FairFace_attr_baseline'):
+        model = models.fairface_attr_core.FairFaceModel_attr(opt)
 
     return model, opt

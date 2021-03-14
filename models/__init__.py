@@ -1,1 +1,2 @@
 import models.fairface_core
+import models.fairface_attr_core
