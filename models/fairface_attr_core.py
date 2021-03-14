@@ -214,10 +214,6 @@ class FairFaceModel_attr():
         # print(train_target)
         # print(train_predict_prob)
         train_mAP = average_precision_score(train_target.cpu(), train_predict_prob)
-
-        # train_per_class_AP = utils.compute_weighted_AP(self.train_target, train_predict_prob, 
-        #                                              self.train_class_weight)
-        # train_mAP = utils.compute_mAP(train_per_class_AP, self.subclass_idx)
         
         self.log_result('Train epoch', {'loss': train_loss/len(self.train_loader), 'mAP': train_mAP},
                         self.epoch)

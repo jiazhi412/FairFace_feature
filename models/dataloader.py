@@ -89,14 +89,17 @@ def category2onehot(category):
 # race_dict = {'East Asian': 0, 'White': 1, 'Latino_Hispanic': 2, 'Southeast Asian': 3, 'Black': 4, 'Indian': 5, 'Middle Eastern': 6}
 # age_dict = {'3-9': 0, '10-19': 1, '20-29': 2, '30-39': 3, '40-49': 4, '50-59': 5, '60-69': 6, 'more than 70': 7}
 
+race_list =  ['Black', 'White', 'Indian', 'East Asian', 'Latino_Hispanic', 'Southeast Asian', 'Middle Eastern'] 
+
 class FairFaceDataset_attr(Dataset):
     def __init__(self, imgs, df, select, percentage, l=None, transform=None):
         self.imgs = imgs
         if select == 'gender':
             self.df = select_gender(df, percentage, l)
-        elif select in ['Black', 'White', 'Indian', 'East_Asian']:
-            if select == "East_Asian":
-                select = "East Asian"
+        elif select == "East_Asian":
+            select = "East Asian"
+            self.df = select_race(df, select, percentage, l)
+        elif select in race_list:
             self.df = select_race(df, select, percentage, l)
         else:
             self.df = df
@@ -139,8 +142,14 @@ def select_gender(df, percentage, l):
     return res
 
 def select_race(df, select, percentage, l):
-    race = df[df["race"] == select]
-    other = df[df["race"] != select]
-    res = pd.concat([race.head(int(l*percentage)), other.head(int(l- l * percentage))])
-    res.index = range(len(res))
-    return res
+    selected_race = df[df["race"] == select]
+    other_race_name = race_list.copy()
+    other_race_name.remove(select)
+    res = [selected_race.head(int(l*percentage))]
+    for race in other_race_name:
+         res.append(df[df['race'] == race].head(int(len(res[0]) / percentage * (1 - percentage) / len(other_race_name))))
+
+    res_df = pd.concat(res)
+    res_df.index = range(len(res_df))
+    print(res_df.groupby('race').count())
+    return res_df

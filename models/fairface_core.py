@@ -25,7 +25,7 @@ class FairFaceModel():
         self.print_freq = opt['print_freq']
         self.init_lr = opt['optimizer_setting']['lr']
         self.opt = opt
-        self.log_writer = SummaryWriter(os.path.join(self.save_path, 'logfile'))
+        # self.log_writer = SummaryWriter(os.path.join(self.save_path, 'logfile'))
         
         self.set_network(opt)
         self.set_data(opt)
