@@ -87,7 +87,7 @@ class FairFaceModel():
                 batch_size=opt['batch_size'], shuffle=False, num_workers=1)
         elif opt['experiment'].endswith('model'):
             self.test_loader = torch.utils.data.DataLoader(
-                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, select = opt['select'], percentage = 0.5, l = opt['test_size'], transform = transform_test), 
+                dataloader.FairFaceDataset(test_image_feature, test_imgs_df, select = opt['select'], percentage = 1/7, l = opt['test_size'], transform = transform_test), 
                 batch_size=opt['batch_size'], shuffle=False, num_workers=1)
 
         self.train_target = utils.normalized(np.array([i for i in range(opt['train_size'])]))

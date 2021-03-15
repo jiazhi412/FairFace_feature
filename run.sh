@@ -1,1 +1,9 @@
-python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.9
+python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.1 --mode test
+python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.2 --mode test
+python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.3 --mode test
+python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.4 --mode test
+python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.5 --mode test
+python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.6 --mode test
+python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.7 --mode test
+python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.8 --mode test
+python main.py --experiment FairFace_attr_baseline_model --experiment-name debug_race --with-cuda --epochs 1 --select Black --percentage 0.9 --mode test

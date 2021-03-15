@@ -33,6 +33,7 @@ class FairFaceModel_attr():
         # self.best_dev_mAP = 0.
         # self.best_train_loss = 10000000000
         self.best_train_mAP = 0.
+        self.best_test_mAP = 0.
 
         self.test_gender = []
         self.test_race = []
@@ -87,8 +88,13 @@ class FairFaceModel_attr():
                 dataloader.FairFaceDataset_attr(test_image_feature, test_imgs_df, select = opt['select'], percentage = opt['percentage'], l = opt['test_size'], transform = transform_test), 
                 batch_size=opt['batch_size'], shuffle=False, num_workers=1)
         elif opt['experiment'].endswith('model'):
+            # keep balance in testing data, gender: 1/2, race: 1/7
+            if opt['select'] == 'gender':
+                percentage = 0.5
+            else:
+                percentage = 1/7
             self.test_loader = torch.utils.data.DataLoader(
-                dataloader.FairFaceDataset_attr(test_image_feature, test_imgs_df, select = opt['select'], percentage = 0.5, l = opt['test_size'], transform = transform_test), 
+                dataloader.FairFaceDataset_attr(test_image_feature, test_imgs_df, select = opt['select'], percentage = percentage, l = opt['test_size'], transform = transform_test), 
                 batch_size=opt['batch_size'], shuffle=False, num_workers=1)
 
         # self.train_target = utils.normalized(np.array([i for i in range(opt['train_size'])]))
@@ -146,10 +152,10 @@ class FairFaceModel_attr():
 
             if self.print_freq and (i % self.print_freq == 0):
                 print('Training epoch {}: [{}|{}], loss:{}'.format(
-                      self.epoch, i+1, len(loader), loss.item()))
+                      self.epoch+1, i+1, len(loader), loss.item()))
         
         # self.train_target = torch.cat(train_targets_list, dim = 1)
-        self.log_result('Train epoch', {'loss': train_loss/len(loader)}, self.epoch)
+        self.log_result('Train epoch', {'loss': train_loss/len(loader)}, self.epoch+1)
         self.epoch += 1
 
     def _test(self, loader):
@@ -198,55 +204,52 @@ class FairFaceModel_attr():
 
         train_loss, train_target, train_output, train_feature = self._test(self.train_loader)
         train_predict_prob = self.inference(train_output)
-        # self.log_result('Train epoch', {'loss': train_loss/len(self.train_loader)}, self.epoch)
-        # if train_loss < self.best_train_loss:
-        #     self.best_train_loss = train_loss
-        #     utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'best_{mode}_{percentage}.pth'))
-        
-        # train_result = {'output': train_output.cpu().numpy(), 
-        #               'feature': train_feature.cpu().numpy(),
-        #               'gender': self.train_gender,
-        #               'race': self.train_race}
-        # utils.save_pkl(train_result, os.path.join(self.save_path, 'train_result.pkl'))
-
-        # print(train_target.shape)
-        # print(train_predict_prob.shape)
-        # print(train_target)
-        # print(train_predict_prob)
         train_mAP = average_precision_score(train_target.cpu(), train_predict_prob)
-        
-        self.log_result('Train epoch', {'loss': train_loss/len(self.train_loader), 'mAP': train_mAP},
-                        self.epoch)
-        if train_mAP > self.best_train_mAP:
-            self.best_train_mAP = train_mAP
-            utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'best_{mode}_{percentage}.pth'))
-        
+
         duration = datetime.now() - start_time
         print('Finish training epoch {}, train mAP: {}, time used: {}'.format(self.epoch, train_mAP, duration))
+        self.log_result('Train epoch', {'loss': train_loss/len(self.train_loader), 'mAP': train_mAP},
+                        self.epoch)
+        # if train_mAP > self.best_train_mAP:
+        #     self.best_train_mAP = train_mAP
+        #     utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'best_{mode}_{percentage}.pth'))
+        
+        ####### Validation #######
+        test_loss, test_target, test_output, test_feature = self._test(self.test_loader)
+        test_predict_prob = self.inference(test_output)
+        test_mAP = average_precision_score(test_target.cpu(), test_predict_prob)
+
+        print('Testing, test mAP: {}'.format(test_mAP))
+        info = ('Test loss: {}\n'
+                'Test mAP: {}'.format(test_loss, test_mAP))
+        if test_mAP > self.best_test_mAP:
+            self.best_test_mAP = test_mAP
+            utils.save_state_dict(self.state_dict(), os.path.join(self.save_path, f'best_{mode}_{percentage}.pth'))
+        
+        
 
     def test(self):
         mode = self.experiment.split("_")[-1]
         percentage = self.opt['percentage']
         # Test and save the result
         state_dict = torch.load(os.path.join(self.save_path, f'best_{mode}_{percentage}.pth'))
-        # print('1.5')
         self.network.load_state_dict(state_dict['model'])
-        # print('2')
         test_loss, test_target, test_output, test_feature = self._test(self.test_loader) 
         test_predict_prob = self.inference(test_output)
         test_mAP = average_precision_score(test_target.cpu(), test_predict_prob)
-        # print('3')
+
         test_result = {'output': test_output.cpu().numpy(), 
                       'feature': test_feature.cpu().numpy(),
                       'gender': self.test_gender,
                       'race': self.test_race}
-        
         utils.save_pkl(test_result, os.path.join(self.save_path, f"feature_{mode}_{percentage}.pkl"))
+
+        print('Testing, test mAP: {}'.format(test_mAP))
         info = ('Test loss: {}\n'
                 'Test mAP: {}'.format(test_loss, test_mAP))
         utils.write_info(os.path.join(self.save_path, 'result.txt'), info)
 
-        print('Testing, test mAP: {}'.format(test_mAP))
+        
 
 
             
