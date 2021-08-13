@@ -20,6 +20,7 @@ def collect_args():
 
     parser.add_argument('--select', default="Black", type=str)
     parser.add_argument('--percentage', default=0.9, type=float)
+    parser.add_argument('--more-race', dest='seven', action='store_true')
 
     parser.add_argument('--train-size', default=40000, type=int)
     parser.add_argument('--test-size', default=5000, type=int)
@@ -40,7 +41,13 @@ def create_experiment_setting(opt):
         opt['print_freq'] = 50
         opt['save_folder'] = os.path.join('record', opt['experiment'], opt['experiment_name'])
         utils.creat_folder(opt['save_folder'])
-        opt['output_dim'] = 18
+
+        if opt['seven']:
+            opt['race_list'] =  ['Black', 'White', 'Indian', 'East Asian', 'Latino_Hispanic', 'Southeast Asian', 'Middle Eastern'] 
+            opt['output_dim'] = 18
+        else:
+            opt['race_list'] =  ['Black', 'White', 'Indian', 'East Asian']
+            opt['output_dim'] = 15
 
         optimizer_setting = {
             'optimizer': torch.optim.Adam,

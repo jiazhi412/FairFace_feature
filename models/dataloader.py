@@ -89,18 +89,20 @@ def category2onehot(category):
 # race_dict = {'East Asian': 0, 'White': 1, 'Latino_Hispanic': 2, 'Southeast Asian': 3, 'Black': 4, 'Indian': 5, 'Middle Eastern': 6}
 # age_dict = {'3-9': 0, '10-19': 1, '20-29': 2, '30-39': 3, '40-49': 4, '50-59': 5, '60-69': 6, 'more than 70': 7}
 
-race_list =  ['Black', 'White', 'Indian', 'East Asian', 'Latino_Hispanic', 'Southeast Asian', 'Middle Eastern'] 
+# race_list =  ['Black', 'White', 'Indian', 'East Asian', 'Latino_Hispanic', 'Southeast Asian', 'Middle Eastern'] 
 
 class FairFaceDataset_attr(Dataset):
-    def __init__(self, imgs, df, select, percentage, l=None, transform=None):
+    def __init__(self, imgs, df, select, percentage, race_list, l=None, transform=None, ):
         self.imgs = imgs
         if select == 'gender':
             self.df = select_gender(df, percentage, l)
         elif select == "East_Asian":
             select = "East Asian"
-            self.df = select_race(df, select, percentage, l)
+            # race_list =  ['Black', 'White', 'Indian', 'East Asian'] 
+            self.df = select_race(df, select, percentage, race_list, l)
         elif select in race_list:
-            self.df = select_race(df, select, percentage, l)
+            # race_list =  ['Black', 'White', 'Indian', 'East Asian'] 
+            self.df = select_race(df, select, percentage, race_list, l)
         else:
             self.df = df
         self.transform = transform
@@ -141,7 +143,7 @@ def select_gender(df, percentage, l):
     res.index = range(len(res))
     return res
 
-def select_race(df, select, percentage, l):
+def select_race(df, select, percentage, race_list, l):
     selected_race = df[df["race"] == select]
     other_race_name = race_list.copy()
     other_race_name.remove(select)

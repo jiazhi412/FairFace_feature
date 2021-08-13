@@ -81,20 +81,20 @@ class FairFaceModel_attr():
         test_image_feature = h5py.File(os.path.join(dir, 'fairface_test.h5py'), 'r')
         
         self.train_loader = torch.utils.data.DataLoader(
-            dataloader.FairFaceDataset_attr(train_image_feature, train_imgs_df, select = opt['select'], percentage = opt['percentage'], l = opt['train_size'], transform = transform_train), 
+            dataloader.FairFaceDataset_attr(train_image_feature, train_imgs_df, select = opt['select'], percentage = opt['percentage'], race_list = opt['race_list'], l = opt['train_size'], transform = transform_train), 
             batch_size=opt['batch_size'], shuffle=True, num_workers=1)
         if opt['experiment'].endswith('data'):
             self.test_loader = torch.utils.data.DataLoader(
-                dataloader.FairFaceDataset_attr(test_image_feature, test_imgs_df, select = opt['select'], percentage = opt['percentage'], l = opt['test_size'], transform = transform_test), 
+                dataloader.FairFaceDataset_attr(test_image_feature, test_imgs_df, select = opt['select'], percentage = opt['percentage'], race_list = opt['race_list'], l = opt['test_size'], transform = transform_test), 
                 batch_size=opt['batch_size'], shuffle=False, num_workers=1)
         elif opt['experiment'].endswith('model'):
-            # keep balance in testing data, gender: 1/2, race: 1/7
+            # keep balance in testing data, gender: 1/2, race: 1/7 or 1/4
             if opt['select'] == 'gender':
                 percentage = 0.5
             else:
-                percentage = 1/7
+                percentage = 1/4
             self.test_loader = torch.utils.data.DataLoader(
-                dataloader.FairFaceDataset_attr(test_image_feature, test_imgs_df, select = opt['select'], percentage = percentage, l = opt['test_size'], transform = transform_test), 
+                dataloader.FairFaceDataset_attr(test_image_feature, test_imgs_df, select = opt['select'], percentage = percentage, race_list = opt['race_list'], l = opt['test_size'], transform = transform_test), 
                 batch_size=opt['batch_size'], shuffle=False, num_workers=1)
 
         # self.train_target = utils.normalized(np.array([i for i in range(opt['train_size'])]))
